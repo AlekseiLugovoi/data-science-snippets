@@ -1,3 +1,4 @@
+import cv2
 import PIL
 from PIL import Image 
 import numpy as np
@@ -110,6 +111,61 @@ def forward_diffusion_step(image, step, beta):
     noisy_image_array = (255 * noisy_image_array).astype(np.uint8)
     noisy_image = Image.fromarray(noisy_image_array)
     return noisy_image
+
+
+def refine_img_morphology(img_pil, kernel_size=15, erosion_iter=1, dilation_iter=3):
+    """ 
+    - убрать черные засечки вне маски
+    - белые засечки внутри маски
+    - увеличить маскируемую область (по форме)
+    
+    """
+
+    img_np = np.array(img_pil)
+    
+    # Создание ядра для морфологических операций
+    kernel = np.ones((kernel_size, kernel_size), np.uint8)
+
+    # Удаление белых засечек вне объекта
+    erosion = cv2.erode(img_np, kernel, iterations=erosion_iter)
+
+    # Закрашивание черных областей внутри объекта
+    dilation = cv2.dilate(erosion, kernel, iterations=dilation_iter)
+    closing = cv2.erode(dilation, kernel, iterations=erosion_iter)
+
+    # Конвертация обработанного изображения обратно в формат PIL
+    if closing.ndim == 3:
+        closing = cv2.cvtColor(closing, cv2.COLOR_BGR2RGB)
+    processed_pil_image = Image.fromarray(closing)
+
+    return processed_pil_image
+
+
+def overlay_colored_masks(img_pil: Image.Image, masks: list[Image.Image], color=(0, 255, 0, 153)):
+    """ Накладываем все маски (L) на исходное изображение """
+    
+    # Конвертируем исходное изображение в формат RGBA, если оно не в этом формате
+    if img_pil.mode != 'RGBA':
+        img_pil = img_pil.convert('RGBA')
+
+    # Создаем полупрозрачное изображение для наложения масок
+    overlay = Image.new('RGBA', img_pil.size, (255, 255, 255, 0))
+
+    # Проходим по всем маскам
+    for mask in masks:
+        # Проверяем, является ли маска изображением в режиме 'L'
+        if mask.mode != 'L':
+            mask = mask.convert('L')
+        
+        colored_mask = Image.new('RGBA', img_pil.size, color)
+
+        # Накладываем маску на изображение с цветом
+        overlay.paste(colored_mask, (0, 0), mask)
+
+    # Накладываем полупрозрачное изображение на оригинальное
+    combined = Image.alpha_composite(img_pil, overlay)
+    
+    return combined
 
 
 
