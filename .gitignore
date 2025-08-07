@@ -1,0 +1,9 @@
+
+# model files and cache
+*.pt
+/generative-ai/DFloat11__Qwen-Image-DF11
+
+.idea/
+.DS_Store
+__pycache__/
+.localdev
